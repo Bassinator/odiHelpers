@@ -16,30 +16,30 @@ def getTechnology(code){
   return technology
 }
 
-def map(context, logicalSchema, physicalSchema){
+def ensureContextualSchemaMapping(context, logicalSchema, physicalSchema){
   existingMapping = getContextualSchemaMapping(context, logicalSchema)
 
   if (existingMapping == null ||  !existingMapping.getPhysicalSchema() == physicalSchema ) {
     mapping = new OdiContextualSchemaMapping(context, logicalSchema, physicalSchema)
     odiInstance.getTransactionalEntityManager().persist(mapping)
-    println "Contextual Schema Mapping angelegt"
+    println "CREATE: contextual schema mapping created"
   }
   else {
-    println "Contextual Schema Mapping existiert bereits"
+    println "EXISTS: contextual schema mapping already exists"
   }
   
 }
 
  
-def createLogicalSchema(name,technology) {
+def ensureLogicalSchema(name,technology) {
   existingSchema = getLogicalSchema(name)
   if (existingSchema == null ||  ! existingSchema.getTechnology() == technology ) {
     schema = new OdiLogicalSchema(technology, name)
     odiInstance.getTransactionalEntityManager().persist(schema)
-    println "logical schema angelegt: "+name
+    println "CREATE: logical schema created: "+name
   }
   else {
-    println "logical schema existiert bereits: "+name
+    println "EXISTS: logical schema already exists: "+name
     schema = existingSchema;
   }
   return schema
@@ -51,54 +51,45 @@ def getLogicalSchema(name){
 }
 
 
-def createDataServer(technology, name, jdbcDriver, jdbcUrl, batchUpdateSize, fetchArraySize){
-  dataServer = createDataServer(technology, name, jdbcDriver, jdbcUrl)
-  dataServer.setBatchUpdateSize(batchUpdateSize)
-  dataServer.setFetchArraySize(fetchArraySize)
-  odiInstance.getTransactionalEntityManager().persist(dataServer)
-  println "CHANGE: dataserver updated: " + name + " batchUpdateSize= " + batchUpdateSize + " fetchArraySize= " + fetchArraySize
-  return dataServer
-}
-
-def createDataServer(technology, name, jdbcDriver, jdbcUrl){
+def ensureDataServer(technology, name, jdbcConnectionProperties, batchUpdateSize, fetchArraySize){
   dataServerFinder = odiInstance.getTransactionalEntityManager().getFinder(OdiDataServer.class);
   existingDataServer = dataServerFinder.findByName(name)
 
   if (existingDataServer == null || existingDataServer.getTechnology() != technology) {
     dataServer = new OdiDataServer(technology, name)
-
-    println "Input user to connect to: " + dataServer
-    username=reader.readLine()
-    println "Input password to connect to: " + dataServer
-    password=reader.readLine()
-    
-    dataServer.setUsername(username)
-    obfuscatedPW = ObfuscatedString.obfuscate(password)
+    dataServer.setUsername(jdbcConnectionProperties.username)
+    obfuscatedPW = ObfuscatedString.obfuscate(jdbcConnectionProperties.password)
     dataServer.setPassword(obfuscatedPW)
-    connectionSettings = new AbstractOdiDataServer.JdbcSettings(jdbcUrl, jdbcDriver)
-    dataServer.setConnectionSettings(connectionSettings)
+    dataServer.setConnectionSettings(jdbcConnectionProperties.connectionSettings)
+    dataServer.setBatchUpdateSize(batchUpdateSize)
+    dataServer.setFetchArraySize(fetchArraySize)
+    
     odiInstance.getTransactionalEntityManager().persist(dataServer)
-    println "CREATE: dataserver angelegt: "+name
+    println "CREATE: dataserver created: "+name
   }
   else {
-    println "EXISTS: dataserver existiert bereits: "+name
+    println "EXISTS: dataserver already exists: "+name
     dataServer = existingDataServer
   }
   return dataServer
 }
 
-def createPhysicalSchema(dataserver, name){
+
+def ensurePhysicalSchema(dataserver, name, workSchemaName){
   def schemaExists = false
   existingSchemata = dataserver.getPhysicalSchemas()
   existingSchema = getPhysicalSchema(dataserver.getName()+"."+name)
   if (existingSchema == null){
     schema = new OdiPhysicalSchema(dataServer)
     schema.setSchemaName(name)
+    if (workSchemaName != null){
+      schema.setWorkSchemaName(workSchemaName)
+    }
     odiInstance.getTransactionalEntityManager().persist(schema)
-    println "Schema angelegt: "+schema.getName()
+    println "CREATE: schema created: "+schema.getName()
   }
   else {
-    println "Schema existiert bereits: "+name
+    println "EXISTS: schema already exists: "+name
     schema = existingSchema
   }
   return schema
@@ -135,4 +126,22 @@ def getContextualSchemaMapping(context, logicalSchema){
 def getContext(code){
   contextFinder = odiInstance.getTransactionalEntityManager().getFinder(OdiContext.class);
   return contextFinder.findByCode(code)
+}
+
+// helper classes
+
+public class JdbcConnectionProperties {
+  def connectionSettings
+  def username = new String()
+  def password = new String()
+  
+  def JdbcConnectionProperties(url, driver, username, password) {
+    connectionSettings = new AbstractOdiDataServer.JdbcSettings(url, driver)
+    this.username = username
+    this.password = password
+  }
+}
+
+def static createJdbcConnectionConfig(url, driver, username, password){
+  return new JdbcConnectionProperties(url, driver, username, password);
 }

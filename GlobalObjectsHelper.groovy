@@ -14,8 +14,27 @@ import oracle.odi.domain.xrefs.expression.Expression;
 def odiInstance;
 
 
-def getRKnowledgeModule(name){
+def getReengineeringKM(name){
   rkmFinder = odiInstance.getTransactionalEntityManager().getFinder(OdiRKM.class);
+  
+  rKnowledgeModule = rkmFinder.findByName(name)
+  
+  return rKnowledgeModule;
+}
+
+
+
+def getLoadingKM(name){
+  rkmFinder = odiInstance.getTransactionalEntityManager().getFinder(OdiLKM.class);
+  
+  rKnowledgeModule = rkmFinder.findByName(name)
+  
+  return rKnowledgeModule;
+}
+
+
+def getIntegrationKM(name){
+  rkmFinder = odiInstance.getTransactionalEntityManager().getFinder(OdiIKM.class);
   
   rKnowledgeModule = rkmFinder.findByName(name)
   
